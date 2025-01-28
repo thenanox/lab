@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3 uid="uid://cjrpunk3gyx3y"]
+
+[ext_resource type="Texture2D" uid="uid://bbq7fn5s3a5ap" path="res://sprites/tile_0108.png" id="1_xxxxx"]
+[ext_resource type="Script" path="res://trail_marker.gd" id="2_xxxxx"]
+
+[node name="TrailMarker" type="Sprite2D"]
+texture = ExtResource("1_xxxxx")
+script = ExtResource("2_xxxxx")
