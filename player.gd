@@ -74,9 +74,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		direction = Vector2i.DOWN
 	
 	if direction != Vector2i.ZERO:
-		if Input.is_action_pressed("jump") && GameManager.current_jumps > 0:
+		if Input.is_action_pressed("jump"):
 			try_jump(direction)
-		elif GameManager.current_moves > 0:
+		else:
 			try_move(direction)
 		get_viewport().set_input_as_handled()
 
@@ -88,6 +88,9 @@ func _on_level_changed(new_start_pos: Vector2i):
 
 func try_move(direction: Vector2i) -> void:
 	if is_moving:
+		return
+	
+	if GameManager.current_moves <= 0:
 		return
 		
 	var target_pos = grid_position + direction
@@ -157,6 +160,11 @@ func try_rewind() -> void:
 		
 	is_moving = true
 	var last_move = move_history.pop_back()
+	if !grid_manager.is_valid_move(last_move.grid_pos):
+		move_history.push_back(last_move)
+		is_moving = false
+		return
+		
 	rewind_buffer.push_back(last_move)
 	
 	# Create trail marker at current position before moving

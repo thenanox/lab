@@ -92,17 +92,17 @@ const LEVELS = {
 			
 			# Switches and walls to toggle
 			[2, 1, 4, 0],  # Switch 1
-			[4, 1, 0, 0],  # Wall 1 (blocks path to switch 2)
+			[4, 1, 0, 0],  # Wall 1
 			[5, 1, 4, 0],  # Switch 2
-			[6, 1, 0, 0],  # Wall 2 (blocks ladder)
-			[6, 2, 3, 0],  # Ladder (behind wall 2)
+			[6, 1, 0, 0],  # Wall 2
+			[6, 2, 3, 0],  # Ladder
 		],
 		"switches": [
 			{"pos": Vector2i(2, 1), "target": Vector2i(4, 1)},  # Switch 1 -> Wall 1
-			{"pos": Vector2i(5, 1), "target": Vector2i(6, 1)}   # Switch 2 -> Wall 2
+			{"pos": Vector2i(5, 1), "target": Vector2i(3, 1)}   # Switch 2 -> Wall 2
 		],
 		"player_start": Vector2i(1, 1),
-		"max_moves": 12,
+		"max_moves": 5,
 		"max_jumps": 0
 	},
 		3: {  # Jump tutorial level
