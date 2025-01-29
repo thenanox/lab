@@ -19,10 +19,7 @@ func _ready():
 		min_pos.y = min(min_pos.y, cell.y)
 		max_pos.x = max(max_pos.x, cell.x)
 		max_pos.y = max(max_pos.y, cell.y)
-	
-	# Calculate level dimensions in pixels
-	var level_size = (max_pos - min_pos + Vector2i.ONE) * 16
-	
+
 	zoom = Vector2(2, 2)
 	position_smoothing_enabled = true
 	position_smoothing_speed = 10.0
