@@ -20,10 +20,8 @@ var is_moving := false
 var is_rewinding := false
 var grid_position: Vector2i
 
-# Inject the grid manager through a property
-@export var grid_manager: GridManager
-
-@export var trail_marker_scene: PackedScene  # Reference to the trail marker scene
+var grid_manager: GridManager
+var trail_marker_scene: PackedScene  # Reference to the trail marker scene
 var trail_markers: Array[Sprite2D] = []
 
 func _ready():
@@ -124,6 +122,7 @@ func try_jump(direction: Vector2i) -> void:
 	var current_pos := grid_position
 	var target_pos := grid_position
 	
+	var can_jump := false
 	# Check consecutive holes
 	while holes_count < max_holes:
 		var next_pos = current_pos + direction
@@ -136,13 +135,13 @@ func try_jump(direction: Vector2i) -> void:
 				current_pos = next_pos
 			else:
 				target_pos = landing_pos
+				can_jump = true
 				break
 		else:
 			holes_count = 0
 			break
 	
-	# If we found holes to jump and have enough jumps
-	if holes_count > 0:
+	if can_jump:
 		is_moving = true
 		move_history.append(HistoryEntry.new(grid_position, holes_count, direction))
 		grid_position = target_pos
@@ -194,9 +193,7 @@ func try_forward() -> void:
 	if next_move.holes_jumped > 0:
 		target_pos = grid_position + (next_move.direction * (next_move.holes_jumped +1))
 	else:
-		target_pos = grid_position + next_move.direction
-		
-		
+		target_pos = grid_position + next_move.direction	
 	
 	grid_position = target_pos
 	position = grid_manager.grid_to_world(grid_position)

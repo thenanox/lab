@@ -1,170 +1,107 @@
 extends Node
-class_name LevelManager
-
-class Switch:
-	var position: Vector2i  # Switch position
-	var target_pos: Vector2i  # Position of tile to toggle
-	var is_pressed := false
-	var persistent := true  # If true, state remains after rewind
-	
-	func _init(pos: Vector2i, target: Vector2i):
-		position = pos
-		target_pos = target
-
-const LEVELS = {
-	1: {  # Tutorial level
-		"tile_data": [
-			# Walls
-			[0, 0, 0, 0],  # Wall
-			[1, 0, 0, 0],  # Wall
-			[2, 0, 0, 0],  # Wall
-			[3, 0, 0, 0],  # Wall
-			[4, 0, 0, 0],  # Wall
-			[5, 0, 0, 0],  # Wall
-			[0, 1, 0, 0],  # Wall
-			[0, 2, 0, 0],  # Wall
-			[0, 3, 0, 0],  # Wall
-			[5, 1, 0, 0],  # Wall
-			[5, 2, 0, 0],  # Wall
-			[5, 3, 0, 0],  # Wall
-			[1, 3, 0, 0],  # Wall
-			[2, 3, 0, 0],  # Wall
-			[3, 3, 0, 0],  # Wall
-			[4, 3, 0, 0],  # Wall
-			[5, 3, 0, 0],  # Wall
-			
-			# Floor
-			[1, 1, 1, 0],  # Floor
-			[2, 1, 1, 0],  # Floor
-			[3, 1, 1, 0],  # Floor
-			[4, 1, 1, 0],  # Floor
-			[1, 2, 1, 0],  # Floor
-			[2, 2, 1, 0],  # Floor
-			[3, 2, 1, 0],  # Floor
-			[4, 2, 1, 0],  # Floor
-			
-			# Hole and Ladder
-			[2, 1, 2, 0],  # Hole
-			[4, 1, 3, 0],  # Ladder (unreachable without jump)
-		],
-		"player_start": Vector2i(1, 1),  # Start at the left side
-		"max_moves": 3,
-		"max_jumps": 1
-	},
-	2: {  # Switch and rewind puzzle level
-		"tile_data": [
-			# Walls
-			[0, 0, 0, 0],  # Wall
-			[1, 0, 0, 0],  # Wall
-			[2, 0, 0, 0],  # Wall
-			[3, 0, 0, 0],  # Wall
-			[4, 0, 0, 0],  # Wall
-			[5, 0, 0, 0],  # Wall
-			[6, 0, 0, 0],  # Wall
-			[7, 0, 0, 0],  # Wall
-			[0, 1, 0, 0],  # Wall
-			[0, 2, 0, 0],  # Wall
-			[0, 3, 0, 0],  # Wall
-			[7, 1, 0, 0],  # Wall
-			[7, 2, 0, 0],  # Wall
-			[7, 3, 0, 0],  # Wall
-			[1, 3, 0, 0],  # Wall
-			[2, 3, 0, 0],  # Wall
-			[3, 3, 0, 0],  # Wall
-			[4, 3, 0, 0],  # Wall
-			[5, 3, 0, 0],  # Wall
-			[6, 3, 0, 0],  # Wall
-			[7, 3, 0, 0],  # Wall
-			
-			# Floor
-			[1, 1, 1, 0],  # Floor
-			[2, 1, 1, 0],  # Floor
-			[3, 1, 1, 0],  # Floor
-			[4, 1, 1, 0],  # Floor
-			[5, 1, 1, 0],  # Floor
-			[6, 1, 1, 0],  # Floor
-			[1, 2, 1, 0],  # Floor
-			[2, 2, 1, 0],  # Floor
-			[3, 2, 1, 0],  # Floor
-			[4, 2, 1, 0],  # Floor
-			[5, 2, 1, 0],  # Floor
-			[6, 2, 1, 0],  # Floor
-			
-			# Switches and walls to toggle
-			[2, 1, 4, 0],  # Switch 1
-			[4, 1, 0, 0],  # Wall 1
-			[5, 1, 4, 0],  # Switch 2
-			[6, 1, 0, 0],  # Wall 2
-			[6, 2, 3, 0],  # Ladder
-		],
-		"switches": [
-			{"pos": Vector2i(2, 1), "target": Vector2i(4, 1)},  # Switch 1 -> Wall 1
-			{"pos": Vector2i(5, 1), "target": Vector2i(3, 1)}   # Switch 2 -> Wall 2
-		],
-		"player_start": Vector2i(1, 1),
-		"max_moves": 5,
-		"max_jumps": 0
-	},
-		3: {  # Jump tutorial level
-		"tile_data": [
-			# Walls
-			[0, 0, 0, 0],  # Wall
-			[1, 0, 0, 0],  # Wall
-			[2, 0, 0, 0],  # Wall
-			[3, 0, 0, 0],  # Wall
-			[4, 0, 0, 0],  # Wall
-			[5, 0, 0, 0],  # Wall
-			[0, 1, 0, 0],  # Wall
-			[0, 2, 0, 0],  # Wall
-			[0, 3, 0, 0],  # Wall
-			[0, 4, 0, 0],  # Wall
-			[0, 5, 0, 0],  # Wall
-			[5, 1, 0, 0],  # Wall
-			[5, 2, 0, 0],  # Wall
-			[5, 3, 0, 0],  # Wall
-			[5, 4, 0, 0],  # Wall
-			[5, 5, 0, 0],  # Wall
-			[1, 5, 0, 0],  # Wall
-			[2, 5, 0, 0],  # Wall
-			[3, 5, 0, 0],  # Wall
-			[4, 5, 0, 0],  # Wall
-			
-			# Floors
-			[1, 1, 1, 0],  # Floor
-			[2, 1, 1, 0],  # Floor
-			[3, 1, 1, 0],  # Floor
-			[4, 1, 1, 0],  # Floor
-			[1, 2, 1, 0],  # Floor
-			[2, 2, 1, 0],  # Floor
-			[3, 2, 1, 0],  # Floor
-			[4, 2, 1, 0],  # Floor
-			[1, 3, 1, 0],  # Floor
-			[2, 3, 1, 0],  # Floor
-			[3, 3, 1, 0],  # Floor
-			[4, 3, 1, 0],  # Floor
-			[1, 4, 1, 0],  # Floor
-			[2, 4, 1, 0],  # Floor
-			[3, 4, 1, 0],  # Floor
-			[4, 4, 1, 0],  # Floor
-
-			# Hole and Ladder
-			[2, 2, 2, 0],  # Hole
-			[2, 3, 2, 0],  # Hole
-			[4, 1, 3, 0],  # Ladder (unreachable without jump)
-		],
-		"player_start": Vector2i(1, 3),
-		"max_moves": 3,
-		"max_jumps": 2
-	},
-}
 
 var current_level := 1
+var levels: Dictionary = {}
+const LEVELS_DIRECTORY = "res://data/"
+
+class LevelData:
+	var id: int = 0
+	var tile_data: Array[Array] = []
+	var player_start: Vector2i = Vector2i.ZERO
+	var max_moves: int = 0
+	var max_jumps: int = 0
+	var switches: Array[Dictionary] = []
+	
+	static func from_json(json_data: Dictionary) -> LevelData:
+		var level = LevelData.new()
+		
+		# Ensure integer conversion
+		level.id = int(json_data.get("id", 0))
+		level.max_moves = int(json_data.get("max_moves", 0))
+		level.max_jumps = int(json_data.get("max_jumps", 0))
+		
+		# Convert tile_data to ensure integer values
+		level.tile_data.clear()
+		for tile in json_data.get("tile_data", []):
+			var converted_tile: Array = [
+				int(tile[0]),   # x
+				int(tile[1]),   # y
+				int(tile[2])    # type
+			]
+			level.tile_data.append(converted_tile)
+		
+		# Convert player_start
+		var start = json_data.get("player_start", [0, 0])
+		level.player_start = Vector2i(int(start[0]), int(start[1]))
+		
+		# Convert switches
+		level.switches.clear()
+		for switch in json_data.get("switches", []):
+			var converted_switch: Dictionary = {
+				"pos": [int(switch["pos"][0]), int(switch["pos"][1])],
+				"targets": [],
+				"types": []
+			}
+			
+			# Convert targets
+			for target in switch.get("targets", []):
+				converted_switch["targets"].append([int(target[0]), int(target[1])])
+			
+			# Convert types
+			for type in switch.get("types", []):
+				converted_switch["types"].append(int(type))
+			
+			level.switches.append(converted_switch)
+		
+		return level
+
+func get_available_levels() -> Array[String]:
+	var levels_list: Array[String] = []
+	var dir = DirAccess.open(LEVELS_DIRECTORY)
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != "":
+			if file_name.ends_with(".json"):
+				levels_list.append(file_name)
+			file_name = dir.get_next()
+	return levels_list
 
 func load_level(level_num: int) -> Dictionary:
-	if !LEVELS.has(level_num):
+	# Construct the file path
+	var file_path = LEVELS_DIRECTORY + "level" + str(level_num) + ".json"
+	
+	# Check if file exists
+	if not FileAccess.file_exists(file_path):
+		push_error("Level file not found: " + file_path)
 		return {}
-		
-	return LEVELS[level_num]
+	
+	# Open and read the file
+	var file = FileAccess.open(file_path, FileAccess.READ)
+	if not file:
+		push_error("Failed to open level file: " + file_path)
+		return {}
+	
+	# Parse JSON
+	var json_string = file.get_as_text()
+	var json_data = JSON.parse_string(json_string)
+	
+	if not json_data:
+		push_error("Failed to parse JSON in level file: " + file_path)
+		return {}
+	
+	# Convert to LevelData
+	var processed_level = LevelData.from_json(json_data)
+	
+	# Convert LevelData back to a dictionary for compatibility
+	return {
+		"id": processed_level.id,
+		"tile_data": processed_level.tile_data,
+		"player_start": [processed_level.player_start.x, processed_level.player_start.y],
+		"max_moves": processed_level.max_moves,
+		"max_jumps": processed_level.max_jumps,
+		"switches": processed_level.switches
+	}
 
 func next_level() -> Dictionary:
 	current_level += 1

@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3 uid="uid://b8o0r3mq1w6p8"]
+
+[ext_resource type="Script" path="res://grid_manager.gd" id="2_nck8d"]
+[ext_resource type="PackedScene" uid="uid://uxdhmo06xtli" path="res://player.tscn" id="3_kl772"]
+[ext_resource type="TileSet" uid="uid://glg14whq4w71" path="res://tileset.tres" id="4_am2cj"]
+[ext_resource type="Script" path="res://game_camera.gd" id="5_gvqho"]
+
+[node name="Main" type="Node2D"]
+
+[node name="GridManager" type="Node2D" parent="." groups=["grid_manager"]]
+script = ExtResource("2_nck8d")
+player_scene = ExtResource("3_kl772")
+
+[node name="TileMapLayer" type="TileMapLayer" parent="GridManager"]
+tile_set = ExtResource("4_am2cj")
+
+[node name="Camera2D" type="Camera2D" parent="GridManager"]
+offset = Vector2(100, 60)
+zoom = Vector2(2, 2)
+script = ExtResource("5_gvqho")

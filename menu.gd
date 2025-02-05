@@ -2,14 +2,14 @@ extends Control
 
 var selected_button := 0
 var buttons: Array[Button] = []
-var input_mode := false
-var level_input := "1"  # Prefill with 1
-var is_editor := false
-var input_label: Label
 var label_background: ColorRect
 var input_container: Control  # New container for input elements
 
 func _ready():
+	# Set window size and mode
+	get_window().size = Vector2i(1920, 1080)
+	get_window().mode = Window.MODE_MAXIMIZED
+	
 	# Explicitly add buttons in the desired order
 	var play_button = $CenterContainer/VBoxContainer/PlayButton
 	var editor_button = $CenterContainer/VBoxContainer/EditorButton
@@ -34,26 +34,15 @@ func _ready():
 	label_background.custom_minimum_size = Vector2(300, 50)
 	label_background.position = Vector2(-150, 0)  # Center horizontally
 	
-	# Create input label
-	input_label = Label.new()
-	input_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	input_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	input_label.custom_minimum_size = Vector2(300, 50)  # Match background size
-	input_label.position = Vector2(-150, 0)  # Match background position
-	input_label.add_theme_font_size_override("font_size", 32)
-	input_label.add_theme_color_override("font_color", Color.WHITE)
-	
 	# Add elements to container
 	input_container.add_child(label_background)
-	input_container.add_child(input_label)
-	
+
 	# Add container to scene
 	$CenterContainer/VBoxContainer.add_child(input_container)
 	
 	# Hide input elements initially
-	input_label.hide()
 	label_background.hide()
-	
+
 	# Set initial selection
 	update_selection()
 
@@ -64,32 +53,6 @@ func _input(event: InputEvent):
 		return
 
 func _unhandled_input(event: InputEvent):
-	if input_mode:
-		if event.is_action_pressed("ui_cancel"):
-			input_mode = false
-			level_input = "1"  # Reset to 1 when canceling
-			input_label.hide()
-			label_background.hide()  # Use direct reference
-			return
-		
-		# Handle level input navigation
-		if event.is_action_pressed("ui_right"):
-			# Increment level, no upper limit specified
-			level_input = str(int(level_input) + 1)
-			input_label.text = "Enter Level: " + level_input
-		elif event.is_action_pressed("ui_left"):
-			# Decrement level, but not below 1
-			var current_level = int(level_input)
-			if current_level > 1:
-				level_input = str(current_level - 1)
-				input_label.text = "Enter Level: " + level_input
-		
-		# Only allow enter to load the level
-		if event.is_action_pressed("ui_accept"):
-			load_level(int(level_input))
-		
-		return
-	
 	# Handle arrow key navigation
 	if event.is_action_pressed("ui_down"):
 		selected_button = (selected_button + 1) % buttons.size()
@@ -101,14 +64,10 @@ func _unhandled_input(event: InputEvent):
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_accept"):
 		match selected_button:
-			0:  # Play Game
-				start_level_input(false)
-			1:  # Level Editor
-				start_level_input(true)
-			2:  # Quit Game
-				quit_game()
+			0: open_play_game()
+			1: open_level_designer()
+			2: quit_game()
 		get_viewport().set_input_as_handled()
-
 
 func update_selection():
 	for i in range(buttons.size()):
@@ -117,37 +76,48 @@ func update_selection():
 		else:
 			buttons[i].release_focus()
 
-func start_level_input(editor: bool):
-	input_mode = true
-	is_editor = editor
-	level_input = "1"
-	input_label.text = "Enter Level: " + level_input
-	label_background.show()
-	input_label.show()
-	buttons[selected_button].grab_focus()
+func open_play_game():
+	# Create a file dialog to select level
+	var file_dialog = FileDialog.new()
+	file_dialog.access = FileDialog.ACCESS_RESOURCES
+	
+	# Use an absolute path to the project's data directory
+	var data_dir = ProjectSettings.globalize_path("res://data/")
+	file_dialog.current_dir = data_dir
+	file_dialog.add_filter("*.json", "Level Files")
+	
+	# Set a larger initial size for the dialog
+	file_dialog.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_SCREEN_WITH_MOUSE_FOCUS
+	file_dialog.size = Vector2i(800, 600)
+	file_dialog.title = "Select Level to Play"
+	
+	# Ensure we're in open file mode, not save
+	file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	
+	file_dialog.file_selected.connect(func(path):
+		# Extract level number from filename
+		var filename = path.get_file()
+		if filename.begins_with("level") and filename.ends_with(".json"):
+			var level_num = int(filename.trim_suffix(".json").trim_prefix("level"))
+			load_play_game(level_num)
+		else:
+			show_error("Invalid level file name. Must be in format 'level<number>.json'")
+	)
+	
+	add_child(file_dialog)
+	file_dialog.popup_centered()
 
-func load_level(level_num: int):
-	if level_num <= 0:
-		show_error("Invalid level number!")
-		return
-		
-	var temp_manager = LevelManager.new()
-	var level_data = temp_manager.load_level(level_num)
-	if level_data.is_empty():
-		show_error("Level %d does not exist!" % level_num)
-		return
-		
-	if is_editor:
-		var editor_scene = load("res://level_editor.tscn") as PackedScene
-		var editor_instance = editor_scene.instantiate()
-		editor_instance.set_level(level_num)
-		get_tree().root.call_deferred("add_child", editor_instance)
-	else:
-		var game_scene = load("res://main.tscn") as PackedScene
-		var game_instance = game_scene.instantiate()
-		var grid_manager = game_instance.get_node("GridManager")
-		grid_manager.level_manager.current_level = level_num
-		get_tree().root.call_deferred("add_child", game_instance)
+func load_play_game(level_num: int):
+	LevelManager.current_level = level_num
+	var game_scene = load("res://play_game.tscn") as PackedScene
+	var game_instance = game_scene.instantiate()
+	get_tree().root.call_deferred("add_child", game_instance)
+	queue_free()
+
+func open_level_designer():
+	var level_designer_scene = load("res://level_designer.tscn") as PackedScene
+	var level_designer_instance = level_designer_scene.instantiate()
+	get_tree().root.call_deferred("add_child", level_designer_instance)
 	queue_free()
 
 func quit_game():

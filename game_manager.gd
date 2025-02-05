@@ -8,7 +8,6 @@ var current_jumps: int
 var moves_label: Label
 var jumps_label: Label
 var tooltip_label: Label
-var restart_button: Button
 var ui: CanvasLayer
 
 func _ready():
@@ -35,17 +34,6 @@ func _ready():
 	tooltip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ui.add_child(tooltip_label)
 	
-	restart_button = Button.new()
-	restart_button.text = "Restart Game"
-	restart_button.custom_minimum_size = Vector2(200, 50)
-	restart_button.hide()
-	restart_button.pressed.connect(restart_game)
-	ui.add_child(restart_button)
-	
-	# Center the button
-	get_viewport().size_changed.connect(_on_viewport_size_changed)
-	_on_viewport_size_changed()
-	
 	reset_actions()
 
 func _on_player_moved():
@@ -59,16 +47,8 @@ func _on_player_jumped():
 	check_game_over()
 
 func _on_player_blocked_by_hole():
-	var level_manager = get_tree().get_first_node_in_group("grid_manager").level_manager
-	if level_manager.current_level == 1:
+	if LevelManager.current_level == 1:
 		show_tooltip("Hold SPACE and press a direction key to jump over holes!")
-
-func _on_viewport_size_changed() -> void:
-	var viewport_size = get_viewport().get_visible_rect().size
-	restart_button.position = Vector2(
-		(viewport_size.x - restart_button.size.x) / 2,
-		(viewport_size.y - restart_button.size.y) / 2 + 50  # 50 pixels below center
-	)
 
 func set_level_limits(moves: int, jumps: int) -> void:
 	max_moves = moves
@@ -87,43 +67,33 @@ func update_ui():
 		moves_label.text = "Moves: %d" % current_moves
 		jumps_label.text = "Jumps: %d" % current_jumps
 
-func show_tooltip(text: String, duration: float = 4.0, show_restart: bool = false) -> void:
+func show_tooltip(text: String, duration: float = 4.0) -> void:
 	tooltip_label.text = text
-	if !show_restart:
+	if duration > 0:
 		var tween = create_tween()
 		tween.tween_interval(duration)
-		tween.tween_callback(func(): tooltip_label.text = "")
-	restart_button.visible = show_restart
+		tween.tween_callback(func(): 
+			if duration > 0:
+				tooltip_label.text = ""
+		)
 
 func check_game_over():
-	var level_manager = get_tree().get_first_node_in_group("grid_manager").level_manager
-	if current_moves <= 0 && level_manager.current_level == 1:
+	if current_moves <= 0 && LevelManager.current_level == 1:
 		show_tooltip("No moves left! Hold R and press LEFT to rewind your moves.\nThen try a different approach...")
-
-func restart_game() -> void:
-	# Show UI elements again
-	moves_label.show()
-	jumps_label.show()
-	tooltip_label.position = Vector2(20, 120)  # Reset tooltip position
-	
-	var level_manager = get_tree().get_first_node_in_group("grid_manager").level_manager
-	level_manager.current_level = 1
-	get_tree().reload_current_scene()
-	tooltip_label.text = ""
-	restart_button.hide()
 
 func on_game_completed() -> void:
 	# Hide UI elements
 	moves_label.hide()
 	jumps_label.hide()
 	
-	# Center and show completion message and button
+	# Center and show completion message
 	var viewport_size = get_viewport().get_visible_rect().size
 	tooltip_label.position = Vector2(
 		(viewport_size.x - tooltip_label.size.x) / 2,
 		(viewport_size.y - tooltip_label.size.y) / 2 - 50
 	)
-	show_tooltip("Congratulations! You've completed all levels!\nClick Restart to play again!", 0.0, true)
+
+	show_tooltip("Congratulations! You've completed all levels!\nPress ESC to return to Main Menu", 10.0)
 
 func hide_ui():
 	if moves_label:
