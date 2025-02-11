@@ -80,6 +80,7 @@ func open_play_game():
 	# Create a file dialog to select level
 	var file_dialog = FileDialog.new()
 	file_dialog.access = FileDialog.ACCESS_RESOURCES
+	file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	
 	# Use an absolute path to the project's data directory
 	var data_dir = ProjectSettings.globalize_path("res://data/")
@@ -90,9 +91,6 @@ func open_play_game():
 	file_dialog.initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_SCREEN_WITH_MOUSE_FOCUS
 	file_dialog.size = Vector2i(800, 600)
 	file_dialog.title = "Select Level to Play"
-	
-	# Ensure we're in open file mode, not save
-	file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	
 	file_dialog.file_selected.connect(func(path):
 		# Extract level number from filename
