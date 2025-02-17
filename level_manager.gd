@@ -40,7 +40,8 @@ class LevelData:
 			var converted_switch: Dictionary = {
 				"pos": [int(switch["pos"][0]), int(switch["pos"][1])],
 				"targets": [],
-				"types": []
+				"types": [],
+				"color": switch.get("color", "#ffff00")  # Copy color information, default to yellow
 			}
 			
 			# Convert targets

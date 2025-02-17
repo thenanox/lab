@@ -10,20 +10,11 @@ func _ready():
 	if used_cells.is_empty():
 		return
 		
-	# Calculate bounds
-	var min_pos = Vector2i(INF, INF)
-	var max_pos = Vector2i(-INF, -INF)
-	
-	for cell in used_cells:
-		min_pos.x = min(min_pos.x, cell.x)
-		min_pos.y = min(min_pos.y, cell.y)
-		max_pos.x = max(max_pos.x, cell.x)
-		max_pos.y = max(max_pos.y, cell.y)
-
 	zoom = Vector2(2, 2)
 	position_smoothing_enabled = true
 	position_smoothing_speed = 10.0
 
 func _process(_delta):
 	if grid_manager.player:
+		# Update camera position to match player position
 		position = grid_manager.player.position

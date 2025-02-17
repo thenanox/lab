@@ -29,6 +29,8 @@ const TILE_SOURCE_ID := 0
 @export var player_scene: PackedScene  # Add this to reference the Player scene
 var player: Player  # Store reference to the player instance
 var active_switches: Array[Switch] = []
+var switch_connections: Array[Switch.Connection] = []  # Store visual connections
+var switch_overlays: Array[Sprite2D] = []  # Store colored overlays for switches and targets
 
 func _ready():
 	if !tile_map_layer:
@@ -52,17 +54,20 @@ func _unhandled_input(event: InputEvent):
 
 func load_current_level():
 	var level_data = LevelManager.load_level(LevelManager.current_level)
+	print("[GridManager] Loading level: ", LevelManager.current_level)
 	if level_data.is_empty():
+		print("[GridManager] No level data found!")
 		return
 		
+	print("[GridManager] Level data: ", level_data)
+	
 	# Set move/jump limits for this level
 	if level_data.has("max_moves") and level_data.has("max_jumps"):
 		GameManager.set_level_limits(level_data.max_moves, level_data.max_jumps)
 	
-	# Clear existing tiles
-	var used_cells = tile_map_layer.get_used_cells()
-	for cell in used_cells:
-		tile_map_layer.erase_cell(cell)
+	# Clear existing tiles and connections
+	clear_tiles()
+	clear_switch_connections()
 		
 	# Load tile data
 	for cell_data in level_data.tile_data:
@@ -93,13 +98,19 @@ func load_current_level():
 	# Load switches
 	active_switches.clear()
 	if level_data.has("switches"):
+		print("[GridManager] Loading switches: ", level_data.switches)
 		for switch_data in level_data.switches:
+			var switch_color = Color(switch_data.get("color", "#ffff00"))  # Default to yellow if no color specified
+			print("[GridManager] Creating switch with color: ", switch_color, " from data: ", switch_data.get("color"))
 			var new_switch = Switch.new(
 				Vector2i(switch_data.pos[0], switch_data.pos[1]), 
 				switch_data.targets,
-				switch_data.get("types", [])
+				switch_data.get("types", []),
+				switch_color
 			)
+			print("[GridManager] New switch color after creation: ", new_switch.color)
 			active_switches.append(new_switch)
+			create_switch_connections(new_switch)
 	
 	# Emit signal for player repositioning after tiles are loaded
 	level_changed.emit(Vector2i(level_data.player_start[0], level_data.player_start[1]))
@@ -124,6 +135,7 @@ func load_next_level():
 		GameManager.set_level_limits(level_data.max_moves, level_data.max_jumps)
 	
 	clear_tiles()
+	clear_switch_connections()
 	
 	# Load tile data
 	for cell_data in level_data.tile_data:
@@ -145,12 +157,15 @@ func load_next_level():
 	active_switches.clear()
 	if level_data.has("switches"):
 		for switch_data in level_data.switches:
+			var switch_color = Color(switch_data.get("color", "#ffff00"))  # Default to yellow if no color specified
 			var new_switch = Switch.new(
 				Vector2i(switch_data.pos[0], switch_data.pos[1]),
 				switch_data.targets,
-				switch_data.get("types", [])
+				switch_data.get("types", []),
+				switch_color
 			)
 			active_switches.append(new_switch)
+			create_switch_connections(new_switch)
 	
 	# Emit signal for player repositioning
 	level_changed.emit(Vector2i(level_data.player_start[0], level_data.player_start[1]))
@@ -179,31 +194,116 @@ func is_switch(grid_position: Vector2i) -> bool:
 		player_reached_switch.emit()
 	return switch_found
 
+func clear_switch_connections():
+	for connection in switch_connections:
+		connection.queue_free()
+	switch_connections.clear()
+	
+	for overlay in switch_overlays:
+		overlay.queue_free()
+	switch_overlays.clear()
+
+func create_switch_connections(switch: Switch):
+	var switch_world_pos = grid_to_world(switch.position)
+	
+	# Create switch overlay with a pulsing effect
+	var switch_overlay = create_colored_overlay(switch.position, switch.color, true)
+	switch_overlays.append(switch_overlay)
+	
+	for target_pos in switch.target_positions:
+		var target_world_pos = grid_to_world(target_pos)
+		
+		# Create a more subtle connection line
+		var connection = switch.create_connection(switch_world_pos, target_world_pos)
+		add_child(connection)
+		switch_connections.append(connection)
+		
+		# Create target overlay with a subtle pulsing effect
+		var target_overlay = create_colored_overlay(target_pos, switch.color, false)
+		switch_overlays.append(target_overlay)
+
+func create_colored_overlay(grid_pos: Vector2i, color: Color, is_switch: bool = false) -> Sprite2D:
+	var overlay = Sprite2D.new()
+	var tile_set_source = tile_map_layer.tile_set.get_source(TILE_SOURCE_ID)
+	overlay.texture = tile_set_source.texture
+	overlay.region_enabled = true
+	overlay.region_rect = Rect2(Vector2(0, 4) * Vector2(17, 17), Vector2(16, 16))
+	
+	# Different visual treatment for switches vs targets
+	var overlay_color = color
+	if is_switch:
+		# Make switch overlay more prominent
+		overlay_color = color.lightened(0.3)
+		overlay_color.a = 0.5
+		
+		# Add pulsing animation for switch
+		var tween = create_tween()
+		tween.set_loops()  # Make it repeat
+		tween.tween_property(overlay, "modulate:a", 0.7, 1.0)
+		tween.tween_property(overlay, "modulate:a", 0.3, 1.0)
+	else:
+		# Make target overlay more subtle
+		overlay_color = color.darkened(0.2)
+		overlay_color.a = 0.2
+		
+		# Add subtle breathing animation for targets
+		var tween = create_tween()
+		tween.set_loops()
+		tween.tween_property(overlay, "modulate:a", 0.3, 1.5)
+		tween.tween_property(overlay, "modulate:a", 0.1, 1.5)
+	
+	overlay.modulate = overlay_color
+	overlay.position = grid_to_world(grid_pos)
+	overlay.z_index = 1  # Draw on top of tiles
+	add_child(overlay)
+	return overlay
+
 func toggle_switch(grid_pos: Vector2i) -> void:
 	for switch in active_switches:
 		if switch.position == grid_pos:
 			switch.is_pressed = !switch.is_pressed
+			print("[GridManager] Switch at ", grid_pos, " pressed. New state: ", switch.is_pressed)
 			
 			# Update switch appearance
 			var atlas_coords = SWITCH_ON_COORDS if switch.is_pressed else SWITCH_OFF_COORDS
 			tile_map_layer.set_cell(grid_pos, TILE_SOURCE_ID, atlas_coords)
 			
-			# Toggle each target tile
+			# Find and pulse all connections for this switch
+			var switch_world_pos = grid_to_world(grid_pos)
+			for connection in switch_connections:
+				if connection.start_pos == switch_world_pos:
+					connection.pulse()
+			
+			# Get the next type once for all targets
+			var first_target = switch.target_positions[0]
+			var first_target_data = tile_map_layer.get_cell_tile_data(first_target)
+			var current_type
+			if first_target_data:
+				if first_target_data.get_custom_data("wall"): current_type = WALL_TYPE
+				elif first_target_data.get_custom_data("hole"): current_type = HOLE_TYPE
+				elif first_target_data.get_custom_data("ladder"): current_type = LADDER_TYPE
+				else: current_type = FLOOR_TYPE
+			
+			print("[GridManager] First target at ", first_target, " current type: ", current_type)
+			var next_type = switch.get_next_tile_type(current_type)
+			print("[GridManager] All targets changing to type: ", next_type)
+			
+			# Toggle each target tile with the switch's color using the same next_type
 			for target_pos in switch.target_positions:
-				var target_data = tile_map_layer.get_cell_tile_data(target_pos)
-				if target_data:
-					# Determine current tile type
-					var current_type = WALL_TYPE if target_data.get_custom_data("wall") else FLOOR_TYPE
-					var next_type = switch.get_next_tile_type(current_type)
-					
-					# Set the new tile type
-					var new_atlas_coords = (WALL_COORDS if next_type == WALL_TYPE else FLOOR_COORDS)
-					tile_map_layer.set_cell(target_pos, TILE_SOURCE_ID, new_atlas_coords)
-					
-					# Add visual effect to the affected tile
-					create_tile_toggle_effect(target_pos)
+				# Set the new tile type based on the next type
+				var new_atlas_coords
+				match next_type:
+					WALL_TYPE: new_atlas_coords = WALL_COORDS
+					FLOOR_TYPE: new_atlas_coords = FLOOR_COORDS
+					HOLE_TYPE: new_atlas_coords = HOLE_COORDS
+					LADDER_TYPE: new_atlas_coords = LADDER_COORDS
+				
+				tile_map_layer.set_cell(target_pos, TILE_SOURCE_ID, new_atlas_coords)
+				
+				# Add visual effect to the affected tile using the switch's color
+				create_tile_toggle_effect(target_pos, switch.color)
 
-func create_tile_toggle_effect(pos: Vector2i) -> void:
+func create_tile_toggle_effect(pos: Vector2i, effect_color: Color) -> void:
 	# Create a temporary sprite for the effect
 	var effect_sprite = Sprite2D.new()
 	var tile_set_source = tile_map_layer.tile_set.get_source(TILE_SOURCE_ID)
@@ -222,6 +322,8 @@ func create_tile_toggle_effect(pos: Vector2i) -> void:
 	
 	# Position the effect sprite
 	effect_sprite.position = tile_map_layer.map_to_local(pos)
+	effect_sprite.modulate = effect_color
+	effect_sprite.z_index = 2  # Draw on top of everything
 	add_child(effect_sprite)
 	
 	# Create a tween for the visual effect
@@ -229,9 +331,11 @@ func create_tile_toggle_effect(pos: Vector2i) -> void:
 	
 	# Scale and color effect
 	tween.tween_property(effect_sprite, "scale", Vector2(1.5, 1.5), 0.1)
-	tween.parallel().tween_property(effect_sprite, "modulate", Color(1.5, 1.5, 1.5, 0.7), 0.1)
+	var highlight_color = effect_color.lightened(0.5)
+	highlight_color.a = 0.7  # Set alpha directly
+	tween.parallel().tween_property(effect_sprite, "modulate", highlight_color, 0.1)
 	tween.tween_property(effect_sprite, "scale", Vector2(1, 1), 0.1)
-	tween.parallel().tween_property(effect_sprite, "modulate", Color.WHITE, 0.1)
+	tween.parallel().tween_property(effect_sprite, "modulate", effect_color, 0.1)
 	
 	# Remove the sprite after the effect
 	tween.tween_callback(func(): effect_sprite.queue_free())

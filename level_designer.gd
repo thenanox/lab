@@ -23,6 +23,8 @@ var switches: Array = []
 var current_switch_targets: Array = []
 var is_placing_switch: bool = false
 var switch_toggle_types: Array[int] = [TileType.WALL, TileType.FLOOR]
+var switch_connections: Array[Switch.Connection] = []  # Store visual connections
+var switch_overlays: Array[Sprite2D] = []  # Store colored overlays for switches and targets
 
 # NEW: A dedicated marker for the player start
 var player_marker: Sprite2D
@@ -127,6 +129,11 @@ func _input(event):
 				current_editing_switch.targets.append([grid_pos.x, grid_pos.y])
 				add_switch_tile_marker(grid_pos)
 				update_targets_list(current_switch_dialog)
+				
+				# Remove only the connections for the current switch being edited
+				remove_switch_connections(current_editing_switch)
+				# Recreate connections for the current switch
+				create_switch_connections(current_editing_switch)
 			elif not is_switch_dialog_open:
 				# Check if clicking on a switch
 				var switch = get_switch_at_position(grid_pos)
@@ -173,7 +180,8 @@ func place_tile(grid_pos: Vector2i):
 		var new_switch = {
 			"pos": [grid_pos.x, grid_pos.y],
 			"targets": [],
-			"types": []
+			"types": [],
+			"color": "#ffff00"  # Default yellow color
 		}
 		switches.append(new_switch)
 		return
@@ -185,7 +193,9 @@ func remove_tile(grid_pos: Vector2i):
 	# Check if tile is part of any switch
 	for switch in switches:
 		if switch.pos[0] == grid_pos.x and switch.pos[1] == grid_pos.y:
-			# Remove switch and all its markers
+			# Remove connections and overlays only for this switch
+			remove_switch_connections(switch)
+			# Remove switch and its markers
 			switches.erase(switch)
 			clear_switch_markers()
 			tile_map_layer.erase_cell(grid_pos)
@@ -357,6 +367,7 @@ func load_level_from_file(path: String):
 	switches.clear()
 	player_start = Vector2i.ZERO
 	player_marker.position = Vector2.ZERO
+	clear_switch_connections()
 	
 	# Load tile data
 	for cell_data in json_data.tile_data:
@@ -379,6 +390,307 @@ func load_level_from_file(path: String):
 	# Load switches
 	if json_data.has("switches"):
 		switches = json_data.switches
+		for switch in switches:
+			create_switch_connections(switch)
+
+func clear_switch_connections():
+	for connection in switch_connections:
+		connection.queue_free()
+	switch_connections.clear()
+	
+	for overlay in switch_overlays:
+		overlay.queue_free()
+	switch_overlays.clear()
+
+func create_switch_connections(switch: Dictionary):
+	var switch_pos = Vector2i(switch.pos[0], switch.pos[1])
+	var switch_world_pos = tile_map_layer.map_to_local(switch_pos)
+	
+	# Create switch overlay
+	var switch_color = Color(switch.get("color", "#ffff00"))  # Default yellow if no color specified
+	var switch_overlay = create_colored_overlay(switch_pos, switch_color)
+	switch_overlays.append(switch_overlay)
+	
+	for target in switch.targets:
+		var target_pos = Vector2i(target[0], target[1])
+		var target_world_pos = tile_map_layer.map_to_local(target_pos)
+		
+		# Create connection
+		var connection = Switch.Connection.new(switch_world_pos, target_world_pos, switch_color)
+		add_child(connection)
+		switch_connections.append(connection)
+		
+		# Create target overlay
+		var target_overlay = create_colored_overlay(target_pos, switch_color)
+		switch_overlays.append(target_overlay)
+
+func create_colored_overlay(grid_pos: Vector2i, color: Color) -> Sprite2D:
+	var overlay = Sprite2D.new()
+	var tile_set_source = tile_map_layer.tile_set.get_source(GridManager.TILE_SOURCE_ID)
+	overlay.texture = tile_set_source.texture
+	overlay.region_enabled = true
+	overlay.region_rect = Rect2(Vector2(0, 4) * Vector2(17, 17), Vector2(16, 16))  # Use floor tile as base
+	var overlay_color = color.lightened(0.2)
+	overlay_color.a = 0.3  # Set alpha directly
+	overlay.modulate = overlay_color
+	overlay.position = tile_map_layer.map_to_local(grid_pos)
+	overlay.z_index = 1  # Draw on top of tiles
+	add_child(overlay)
+	return overlay
+
+func show_switch_dialog():
+	is_switch_dialog_open = true
+	current_switch_dialog = Window.new()
+	current_switch_dialog.title = "Configure Switch"
+	current_switch_dialog.size = Vector2i(400, 600)  # Reduced width, kept good height
+	current_switch_dialog.unresizable = false  # Allow resizing
+	current_switch_dialog.close_requested.connect(on_switch_dialog_cancelled)
+	
+	var vbox = VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.custom_minimum_size = Vector2i(380, 580)  # Adjusted to fit window with padding
+	current_switch_dialog.add_child(vbox)
+	
+	# Step 0: Color Selection
+	var step0_label = Label.new()
+	step0_label.text = "Step 0: Select Switch Color"
+	vbox.add_child(step0_label)
+	
+	var color_picker = ColorPickerButton.new()
+	color_picker.custom_minimum_size = Vector2(200, 30)
+	if current_editing_switch.has("color"):
+		color_picker.color = Color(current_editing_switch.color)
+	else:
+		color_picker.color = Color(1, 1, 0)  # Default yellow
+	vbox.add_child(color_picker)
+	
+	# Update connections when color changes
+	color_picker.color_changed.connect(func(new_color: Color):
+		current_editing_switch.color = new_color.to_html()
+		remove_switch_connections(current_editing_switch)
+		create_switch_connections(current_editing_switch)
+	)
+	
+	# Step 1: Type Selection
+	var step1_label = Label.new()
+	step1_label.text = "\nStep 1: Select Tile Type Sequence"
+	vbox.add_child(step1_label)
+	
+	var type_container = VBoxContainer.new()
+	type_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	type_container.custom_minimum_size = Vector2(0, 150)  # Reduced height
+	vbox.add_child(type_container)
+	
+	var sequence_label = Label.new()
+	sequence_label.text = "Current Sequence: (none)"
+	sequence_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sequence_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(sequence_label)
+	
+	# Initialize ordered_types with existing types if any
+	var ordered_types: Array[int] = []
+	if current_editing_switch.has("types"):
+		for type in current_editing_switch.types:
+			ordered_types.append(type as int)
+	
+	# Type buttons
+	var type_buttons = {
+		TileType.WALL: "Wall",
+		TileType.FLOOR: "Floor",
+		TileType.HOLE: "Hole",
+		TileType.LADDER: "Ladder"
+	}
+	
+	# Update sequence label with existing types immediately
+	if not ordered_types.is_empty():
+		update_sequence_label(sequence_label, ordered_types, type_buttons)
+	
+	var type_grid = GridContainer.new()
+	type_grid.columns = 2  # Two buttons per row
+	type_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	type_container.add_child(type_grid)
+	
+	for type in type_buttons:
+		var btn = Button.new()
+		btn.text = "Add " + type_buttons[type]
+		btn.custom_minimum_size = Vector2(180, 30)  # Smaller buttons
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		type_grid.add_child(btn)
+		btn.pressed.connect(func():
+			ordered_types.append(type)
+			update_sequence_label(sequence_label, ordered_types, type_buttons)
+		)
+	
+	# Clear sequence button
+	var clear_btn = Button.new()
+	clear_btn.text = "Clear Sequence"
+	clear_btn.custom_minimum_size = Vector2(180, 30)
+	clear_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	type_container.add_child(clear_btn)
+	clear_btn.pressed.connect(func():
+		ordered_types.clear()
+		sequence_label.text = "Current Sequence: (none)"
+	)
+	
+	# Step 2: Target Selection
+	var step2_label = Label.new()
+	step2_label.text = "\nStep 2: Select Target Tiles"
+	vbox.add_child(step2_label)
+	
+	# Create targets container with a unique name
+	var targets_container = VBoxContainer.new()
+	targets_container.name = "TargetsContainer"
+	targets_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	targets_container.custom_minimum_size = Vector2i(0, 150)  # Reduced height
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2i(0, 150)  # Match container height
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(targets_container)
+	vbox.add_child(scroll)
+	
+	# Show existing targets and their markers
+	if not current_editing_switch.targets.is_empty():
+		clear_switch_markers()  # Clear any existing markers
+		remove_switch_connections(current_editing_switch)  # Only remove connections for this switch
+		for target in current_editing_switch.targets:
+			add_switch_tile_marker(Vector2i(target[0], target[1]))
+		create_switch_connections(current_editing_switch)  # Create new connections
+		update_targets_list(current_switch_dialog)
+	
+	var target_btn = Button.new()
+	target_btn.text = "Add Targets"
+	target_btn.custom_minimum_size = Vector2(180, 30)
+	target_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(target_btn)
+	
+	target_btn.pressed.connect(func():
+		is_adding_targets = !is_adding_targets
+		target_btn.text = "Stop Adding" if is_adding_targets else "Add Targets"
+	)
+	
+	# Save button
+	var save_btn = Button.new()
+	save_btn.text = "Save Switch"
+	save_btn.custom_minimum_size = Vector2(180, 30)
+	save_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(save_btn)
+	save_btn.pressed.connect(func():
+		# Validate switch configuration
+		if ordered_types.is_empty():
+			show_error_dialog("Please add at least one tile type to the sequence.")
+			return
+			
+		if current_editing_switch.targets.is_empty():
+			show_error_dialog("Please add at least one target tile.")
+			return
+			
+		# Update switch data
+		current_editing_switch.types = ordered_types
+		current_editing_switch.color = color_picker.color.to_html()
+		
+		# Make sure the switch is in the switches array
+		if not (current_editing_switch in switches):
+			switches.append(current_editing_switch)
+		
+		# Update visuals
+		remove_switch_connections(current_editing_switch)
+		create_switch_connections(current_editing_switch)
+		
+		# Clean up and close dialog
+		enable_ui_buttons()
+		is_switch_dialog_open = false
+		is_adding_targets = false
+		current_switch_dialog.queue_free()
+		current_switch_dialog = null
+	)
+	
+	add_child(current_switch_dialog)
+	current_switch_dialog.popup_centered()
+
+func show_error_dialog(text: String):
+	var dialog = AcceptDialog.new()
+	dialog.dialog_text = text
+	dialog.title = "Error"
+	add_child(dialog)
+	dialog.popup_centered()
+
+func on_switch_dialog_cancelled():
+	is_switch_dialog_open = false
+	
+	# Only remove the switch if it's new and not fully configured
+	if current_editing_switch in switches:
+		if current_editing_switch.types.is_empty() or current_editing_switch.targets.is_empty():
+			switches.erase(current_editing_switch)
+			# Remove the switch tile
+			var pos = Vector2i(current_editing_switch.pos[0], current_editing_switch.pos[1])
+			tile_map_layer.erase_cell(pos)
+			remove_switch_connections(current_editing_switch)
+	else:
+		# New switch that was never saved
+		var pos = Vector2i(current_editing_switch.pos[0], current_editing_switch.pos[1])
+		tile_map_layer.erase_cell(pos)
+		remove_switch_connections(current_editing_switch)
+	
+	enable_ui_buttons()
+	clear_switch_markers()
+	current_switch_dialog.queue_free()
+	current_switch_dialog = null
+	is_adding_targets = false
+	current_editing_switch = {}
+
+func update_sequence_label(label: Label, types: Array, buttons: Dictionary):
+	if types.is_empty():
+		label.text = "Current Sequence: (none)"
+		return
+	
+	var names = []
+	for type in types:
+		names.append(buttons[type])
+	label.text = "Current Sequence: " + " -> ".join(names) + " -> " + names[0]
+
+func update_targets_list(dialog: Window):
+	var targets_container = dialog.get_node_or_null("%TargetsContainer")
+	if not targets_container:
+		return
+	
+	for child in targets_container.get_children():
+		child.queue_free()
+	
+	if current_editing_switch.targets.is_empty():
+		var label = Label.new()
+		label.text = "No targets selected"
+		targets_container.add_child(label)
+		return
+		
+	for i in range(current_editing_switch.targets.size()):
+		var target = current_editing_switch.targets[i]
+		var hbox = HBoxContainer.new()
+		
+		var label = Label.new()
+		label.text = "Target %d: (%d, %d)" % [i + 1, target[0], target[1]]
+		hbox.add_child(label)
+		
+		var remove_btn = Button.new()
+		remove_btn.text = "Remove"
+		remove_btn.pressed.connect(func():
+			current_editing_switch.targets.remove_at(i)
+			clear_switch_markers()
+			# Recreate markers for remaining targets
+			for t in current_editing_switch.targets:
+				add_switch_tile_marker(Vector2i(t[0], t[1]))
+			update_targets_list(dialog)
+		)
+		hbox.add_child(remove_btn)
+		
+		targets_container.add_child(hbox)
+
+# Add function to find switch at position
+func get_switch_at_position(grid_pos: Vector2i) -> Dictionary:
+	for switch in switches:
+		if switch.pos[0] == grid_pos.x and switch.pos[1] == grid_pos.y:
+			return switch
+	return {}
 
 # Add this helper function to check if a position is within the valid grid
 func is_within_grid(pos: Vector2i) -> bool:
@@ -441,109 +753,34 @@ func update_targets_container(targets: Array, container: VBoxContainer) -> void:
 		label.text = "Target: " + str(target)
 		container.add_child(label)
 
-func show_switch_dialog():
-	is_switch_dialog_open = true
-	current_switch_dialog = Window.new()
-	current_switch_dialog.title = "Configure Switch"
-	current_switch_dialog.size = Vector2i(400, 600)
-	current_switch_dialog.unresizable = true
-	current_switch_dialog.close_requested.connect(on_switch_dialog_cancelled)
+# Add new function to remove connections for a specific switch
+func remove_switch_connections(switch: Dictionary):
+	var switch_world_pos = tile_map_layer.map_to_local(Vector2i(switch.pos[0], switch.pos[1]))
 	
-	var vbox = VBoxContainer.new()
-	vbox.custom_minimum_size = Vector2i(380, 580)
-	current_switch_dialog.add_child(vbox)
+	# Remove connections for this switch
+	var connections_to_remove: Array[Switch.Connection] = []
+	for connection in switch_connections:
+		if connection.start_pos == switch_world_pos:
+			connections_to_remove.append(connection)
 	
-	# Step 1: Type Selection
-	var step1_label = Label.new()
-	step1_label.text = "Step 1: Select Tile Type Sequence"
-	vbox.add_child(step1_label)
+	# Remove overlays for this switch and its targets
+	var overlays_to_remove: Array[Sprite2D] = []
+	for overlay in switch_overlays:
+		var overlay_grid_pos = tile_map_layer.local_to_map(overlay.position)
+		if overlay_grid_pos == Vector2i(switch.pos[0], switch.pos[1]):
+			overlays_to_remove.append(overlay)
+		for target in switch.targets:
+			if overlay_grid_pos == Vector2i(target[0], target[1]):
+				overlays_to_remove.append(overlay)
 	
-	var type_container = VBoxContainer.new()
-	vbox.add_child(type_container)
+	# Free and remove the connections and overlays
+	for connection in connections_to_remove:
+		connection.queue_free()
+		switch_connections.erase(connection)
 	
-	var sequence_label = Label.new()
-	sequence_label.text = "Current Sequence: (none)"
-	vbox.add_child(sequence_label)
-	
-	# Initialize ordered_types with existing types if any
-	var ordered_types: Array[int] = []
-	if current_editing_switch.has("types"):
-		for type in current_editing_switch.types:
-			ordered_types.append(type as int)
-	
-	# Type buttons
-	var type_buttons = {
-		TileType.WALL: "Wall",
-		TileType.FLOOR: "Floor",
-		TileType.HOLE: "Hole",
-		TileType.LADDER: "Ladder"
-	}
-	
-	for type in type_buttons:
-		var btn = Button.new()
-		btn.text = "Add " + type_buttons[type]
-		type_container.add_child(btn)
-		btn.pressed.connect(func():
-			ordered_types.append(type)
-			update_sequence_label(sequence_label, ordered_types, type_buttons)
-		)
-	
-	# Clear sequence button
-	var clear_btn = Button.new()
-	clear_btn.text = "Clear Sequence"
-	type_container.add_child(clear_btn)
-	clear_btn.pressed.connect(func():
-		ordered_types.clear()
-		sequence_label.text = "Current Sequence: (none)"
-	)
-	
-	# Step 2: Target Selection
-	var step2_label = Label.new()
-	step2_label.text = "\nStep 2: Select Target Tiles"
-	vbox.add_child(step2_label)
-	
-	# Create targets container with a unique name
-	var targets_container = VBoxContainer.new()
-	targets_container.name = "TargetsContainer"
-	targets_container.custom_minimum_size = Vector2i(0, 200)
-	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2i(0, 200)
-	scroll.add_child(targets_container)
-	vbox.add_child(scroll)
-	
-	# Show existing targets and their markers
-	if not current_editing_switch.targets.is_empty():
-		clear_switch_markers()  # Clear any existing markers
-		for target in current_editing_switch.targets:
-			add_switch_tile_marker(Vector2i(target[0], target[1]))
-		update_targets_list(current_switch_dialog)
-	
-	var target_btn = Button.new()
-	target_btn.text = "Add Targets"
-	vbox.add_child(target_btn)
-	
-	target_btn.pressed.connect(func():
-		is_adding_targets = !is_adding_targets
-		target_btn.text = "Stop Adding" if is_adding_targets else "Add Targets"
-	)
-	
-	# Save button
-	var save_btn = Button.new()
-	save_btn.text = "Save Switch"
-	vbox.add_child(save_btn)
-	save_btn.pressed.connect(func():
-		if ordered_types.size() > 0:
-			current_editing_switch.types = ordered_types
-			enable_ui_buttons()
-			is_switch_dialog_open = false
-			current_switch_dialog.queue_free()
-			current_switch_dialog = null
-			is_adding_targets = false
-			current_editing_switch = {}
-	)
-	
-	add_child(current_switch_dialog)
-	current_switch_dialog.popup_centered()
+	for overlay in overlays_to_remove:
+		overlay.queue_free()
+		switch_overlays.erase(overlay)
 
 func disable_ui_buttons():
 	for child in ui_layer.get_children():
@@ -554,72 +791,3 @@ func enable_ui_buttons():
 	for child in ui_layer.get_children():
 		if child is Button:
 			child.disabled = false
-
-func on_switch_dialog_cancelled():
-	is_switch_dialog_open = false
-	# Remove the switch if dialog is cancelled
-	if current_editing_switch in switches:
-		switches.erase(current_editing_switch)
-		# Remove the switch tile
-		var pos = Vector2i(current_editing_switch.pos[0], current_editing_switch.pos[1])
-		tile_map_layer.erase_cell(pos)
-	
-	enable_ui_buttons()
-	clear_switch_markers()
-	current_switch_dialog.queue_free()
-	current_switch_dialog = null
-	is_adding_targets = false
-	current_editing_switch = {}
-
-func update_sequence_label(label: Label, types: Array, buttons: Dictionary):
-	if types.is_empty():
-		label.text = "Current Sequence: (none)"
-		return
-	
-	var names = []
-	for type in types:
-		names.append(buttons[type])
-	label.text = "Current Sequence: " + " -> ".join(names) + " -> " + names[0]
-
-func update_targets_list(dialog: Window):
-	var targets_container = dialog.get_node_or_null("%TargetsContainer")
-	if not targets_container:
-		return
-	
-	for child in targets_container.get_children():
-		child.queue_free()
-	
-	if current_editing_switch.targets.is_empty():
-		var label = Label.new()
-		label.text = "No targets selected"
-		targets_container.add_child(label)
-		return
-		
-	for i in range(current_editing_switch.targets.size()):
-		var target = current_editing_switch.targets[i]
-		var hbox = HBoxContainer.new()
-		
-		var label = Label.new()
-		label.text = "Target %d: (%d, %d)" % [i + 1, target[0], target[1]]
-		hbox.add_child(label)
-		
-		var remove_btn = Button.new()
-		remove_btn.text = "Remove"
-		remove_btn.pressed.connect(func():
-			current_editing_switch.targets.remove_at(i)
-			clear_switch_markers()
-			# Recreate markers for remaining targets
-			for t in current_editing_switch.targets:
-				add_switch_tile_marker(Vector2i(t[0], t[1]))
-			update_targets_list(dialog)
-		)
-		hbox.add_child(remove_btn)
-		
-		targets_container.add_child(hbox)
-
-# Add function to find switch at position
-func get_switch_at_position(grid_pos: Vector2i) -> Dictionary:
-	for switch in switches:
-		if switch.pos[0] == grid_pos.x and switch.pos[1] == grid_pos.y:
-			return switch
-	return {}

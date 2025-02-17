@@ -15,6 +15,5 @@ player_scene = ExtResource("3_kl772")
 tile_set = ExtResource("4_am2cj")
 
 [node name="Camera2D" type="Camera2D" parent="GridManager"]
-offset = Vector2(100, 60)
 zoom = Vector2(2, 2)
 script = ExtResource("5_gvqho")
