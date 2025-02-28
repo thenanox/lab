@@ -1,10 +1,6 @@
 ---
-description: Rules for placing and organizing Cursor rule files in the repository.
-globs: 
----
----
 description: Cursor Rules Location
-globs: *.mdc
+globs: *.md5
 ---
 # Cursor Rules Location
 
