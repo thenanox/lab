@@ -1,5 +1,5 @@
 ---
-description: 
+description: Rule for automatically committing changes made by CursorAI using conventional commits format.
 globs: 
 ---
 # Git Conventional Commits
