@@ -1,5 +1,83 @@
 ---
-description: 
-globs: 
+description: Godot Version Requirement
+globs: *.gd, *.tscn, *.tres, *.gdshader, project.godot, *.png
 ---
- 
+# Godot Version Requirement
+
+Rule for ensuring all code in this repository uses Godot 4.3 version, is compatible with it, and references the official documentation.
+
+<rule>
+name: godot_version_requirement
+description: Ensures all code in this repository uses Godot 4.3 version, is compatible with it, and references the official documentation
+filters:
+  # Match Godot project files
+  - type: file_extension
+    pattern: "\\.gd$|\\.tscn$|\\.tres$|\\.gdshader$"
+  # Match project.godot file
+  - type: file_pattern
+    pattern: "project\\.godot$"
+  # Match file creation and modification events
+  - type: event
+    pattern: "file_create|file_modify"
+
+actions:
+  - type: reject
+    conditions:
+      - pattern: "config_version\\s*=\\s*[^4]"
+        message: "Godot project must use version 4.x"
+      - pattern: "godot_version\\s*=\\s*\"(?!4\\.3)"
+        message: "Godot project must use version 4.3 specifically"
+
+  - type: suggest
+    message: |
+      All code in this repository must use Godot 4.3 version, be compatible with it, and reference the official documentation.
+
+      When working with Godot files:
+
+      1. Ensure project.godot file contains:
+         ```
+         config_version=4
+         godot_version="4.3"
+         ```
+
+      2. Do not use features deprecated in Godot 4.3
+
+      3. Do not use features only available in versions other than 4.3
+
+      4. When creating new scripts or scenes:
+         - Use Godot 4.3 syntax and APIs
+         - Follow Godot 4.3 best practices
+         - Verify code compiles and works with Godot 4.3
+         - If code doesn't compile, revisit and make it Godot 4.3 compatible
+
+      5. When importing assets:
+         - Use import settings compatible with Godot 4.3
+
+      6. Always reference the official Godot documentation:
+         - https://docs.godotengine.org/en/stable/
+         - Ensure all code follows the patterns and practices in the documentation
+         - When proposing code, verify it against the documentation and its a valid code for godot 4.3
+
+examples:
+  - input: |
+      # Bad: Using a different Godot version
+      config_version=4
+      godot_version="4.2"
+
+      # Good: Using the required Godot version
+      config_version=4
+      godot_version="4.3"
+    output: "Correctly specified Godot version"
+
+  - input: |
+      # Bad: Using deprecated method from Godot 3.x
+      get_node("Path").set_text("Hello")
+
+      # Good: Using Godot 4.3 compatible method
+      get_node("Path").text = "Hello"
+    output: "Code is compatible with Godot 4.3"
+
+metadata:
+  priority: high
+  version: 1.0
+</rule>
