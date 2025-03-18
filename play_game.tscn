@@ -1,9 +1,9 @@
 [gd_scene load_steps=5 format=3 uid="uid://b8o0r3mq1w6p8"]
 
-[ext_resource type="Script" path="res://grid_manager.gd" id="2_nck8d"]
+[ext_resource type="Script" uid="uid://c8m8vekq2gwld" path="res://grid_manager.gd" id="2_nck8d"]
 [ext_resource type="PackedScene" uid="uid://uxdhmo06xtli" path="res://player.tscn" id="3_kl772"]
 [ext_resource type="TileSet" uid="uid://glg14whq4w71" path="res://tileset.tres" id="4_am2cj"]
-[ext_resource type="Script" path="res://game_camera.gd" id="5_gvqho"]
+[ext_resource type="Script" uid="uid://d4li1n0thu8hp" path="res://game_camera.gd" id="5_gvqho"]
 
 [node name="Main" type="Node2D"]
 

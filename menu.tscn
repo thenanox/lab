@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://clp4b2cne4edj"]
 
-[ext_resource type="Script" path="res://menu.gd" id="1_xxxxx"]
+[ext_resource type="Script" uid="uid://cxcvwwkwo3pne" path="res://menu.gd" id="1_xxxxx"]
 [ext_resource type="Texture2D" uid="uid://coi2jc6d120tb" path="res://sprites/background.png" id="2_xxxxx"]
 
 [node name="Menu" type="Control"]
@@ -40,8 +40,8 @@ custom_minimum_size = Vector2(200, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_filter = 2
-theme_override_colors/font_focus_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_font_sizes/font_size = 24
 text = "Play Game"
 
@@ -50,8 +50,8 @@ custom_minimum_size = Vector2(200, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_filter = 2
-theme_override_colors/font_focus_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_font_sizes/font_size = 24
 text = "Level Editor"
 
@@ -60,7 +60,7 @@ custom_minimum_size = Vector2(200, 50)
 layout_mode = 2
 focus_mode = 0
 mouse_filter = 2
-theme_override_colors/font_focus_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(0.8, 0.8, 0.8, 1)
 theme_override_font_sizes/font_size = 24
 text = "Quit Game"

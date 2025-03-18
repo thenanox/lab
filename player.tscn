@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://uxdhmo06xtli"]
 
 [ext_resource type="Texture2D" uid="uid://bbq7fn5s3a5ap" path="res://sprites/player.png" id="1_1lmhr"]
-[ext_resource type="Script" path="res://player.gd" id="1_fwqau"]
+[ext_resource type="Script" uid="uid://b7b1eh8ps2msw" path="res://player.gd" id="1_fwqau"]
 [ext_resource type="PackedScene" uid="uid://cjrpunk3gyx3y" path="res://trail_marker.tscn" id="2_ofv4k"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_v27mj"]
