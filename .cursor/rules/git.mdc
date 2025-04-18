@@ -1,6 +1,7 @@
 ---
-description: Git Conventional Commits
+description: Everytime a feature is finished commit
 globs: 
+alwaysApply: false
 ---
 # Git Conventional Commits
 
